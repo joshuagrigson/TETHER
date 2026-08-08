@@ -2,14 +2,25 @@
 
 TETHER is a premium, futuristic, anime-inspired relationship intelligence app built with Flutter.
 
-## Phase 1
+## Current build
 
-Phase 1 establishes the Android-first Flutter foundation, domain models, theme tokens, dashboard shell, relationship health logic, and reusable relationship UI primitives.
+**Phase 2 — Relationship intelligence surface** is now implemented on the feature branch:
+
+- Relationship profiles with bond health and XP gauges
+- Interaction timeline model and seeded timeline presentation
+- Memories, tags, important dates, and notes in the domain model
+- Add-note flow directly from a relationship profile
+- Edit relationship flow
+- Repository boundary for relationship data
+- ChangeNotifier provider for application state
+- Dashboard cards now open real relationship profiles
+- Flutter CI for analysis and unit tests
 
 ## Architecture
 
 - `lib/core` — routing, theme, shared infrastructure
 - `lib/models` — immutable domain models
+- `lib/repositories` — persistence/data boundaries
 - `lib/services` — isolated business logic
 - `lib/providers` — application state boundaries
 - `lib/screens` — screen composition
