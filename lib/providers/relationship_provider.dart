@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/person.dart';
 import '../repositories/relationship_repository.dart';
+import '../services/relationship_health_service.dart';
 
 class RelationshipProvider extends ChangeNotifier {
   RelationshipProvider([RelationshipRepository? repository]) : _repository = repository ?? RelationshipRepository() {
@@ -9,6 +10,7 @@ class RelationshipProvider extends ChangeNotifier {
   }
 
   final RelationshipRepository _repository;
+  static const _healthService = RelationshipHealthService();
   bool _isLoading = true;
 
   List<Person> get people => _repository.people;
@@ -22,9 +24,19 @@ class RelationshipProvider extends ChangeNotifier {
   }
 
   void save(Person person) {
-    _repository.save(person);
+    final normalized = person.copyWith(state: _healthService.classify(person));
+    _repository.save(normalized);
     notifyListeners();
     unawaited(_repository.persist());
+  }
+
+  void recordInteraction(String id, {int xp = 25}) {
+    final person = findById(id);
+    if (person == null) return;
+    save(person.copyWith(
+      recentInteractions: person.recentInteractions + 1,
+      bondXp: person.bondXp + xp,
+    ));
   }
 
   void delete(String id) {
