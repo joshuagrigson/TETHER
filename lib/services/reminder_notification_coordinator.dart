@@ -4,13 +4,14 @@ import 'relationship_attention_service.dart';
 import 'reminder_service.dart';
 
 class ReminderNotificationCoordinator {
-  const ReminderNotificationCoordinator({
-    NotificationService notificationService = const NotificationService(),
-    RelationshipAttentionService attentionService = const RelationshipAttentionService(),
-    ReminderService reminderService = const ReminderService(),
-  }) : _notificationService = notificationService,
-       _attentionService = attentionService,
-       _reminderService = reminderService;
+  ReminderNotificationCoordinator({
+    NotificationService? notificationService,
+    RelationshipAttentionService? attentionService,
+    ReminderService? reminderService,
+  })  : _notificationService = notificationService ?? NotificationService(),
+        _attentionService =
+            attentionService ?? const RelationshipAttentionService(),
+        _reminderService = reminderService ?? const ReminderService();
 
   final NotificationService _notificationService;
   final RelationshipAttentionService _attentionService;
@@ -20,10 +21,13 @@ class ReminderNotificationCoordinator {
     final reference = now ?? DateTime.now();
     await _notificationService.cancelAll();
 
-    final candidates = _attentionService.prioritize(people, now: reference, limit: 5);
+    final candidates =
+        _attentionService.prioritize(people, now: reference, limit: 5);
     for (final person in candidates) {
       final due = _reminderService.nextDue(person, from: reference);
-      final when = due.isBefore(reference) ? reference.add(const Duration(minutes: 1)) : due;
+      final when = due.isBefore(reference)
+          ? reference.add(const Duration(minutes: 1))
+          : due;
       await _notificationService.scheduleRelationshipReminder(
         id: _notificationId(person.id),
         personName: person.name,
