@@ -1,0 +1,1397 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../core/theme/tether_theme.dart';
+import '../../models/person.dart';
+import '../../providers/relationship_provider.dart';
+import '../../services/relationship_attention_service.dart';
+import '../relationship/add_relationship_screen.dart';
+import '../relationship/relationship_detail_screen.dart';
+
+class PremiumDashboardScreen extends StatefulWidget {
+  const PremiumDashboardScreen({super.key});
+
+  @override
+  State<PremiumDashboardScreen> createState() => _PremiumDashboardScreenState();
+}
+
+class _PremiumDashboardScreenState extends State<PremiumDashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ambient;
+  int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ambient = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ambient.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<RelationshipProvider>();
+    final people = provider.people;
+
+    return Scaffold(
+      backgroundColor: TetherColors.obsidian,
+      body: Stack(
+        children: [
+          Positioned.fill(child: _AmbientBackground(animation: _ambient)),
+          SafeArea(
+            child: IndexedStack(
+              index: _tab,
+              children: [
+                _DashboardBody(people: people, loading: provider.isLoading),
+                _PeopleBody(people: people),
+                const _ReminderBody(),
+                const _ProfileBody(),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _BottomNav(
+        selected: _tab,
+        onSelected: (value) => setState(() => _tab = value),
+        onAdd: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AddRelationshipScreen()),
+        ),
+      ),
+    );
+  }
+}
+
+class _AmbientBackground extends StatelessWidget {
+  const _AmbientBackground({required this.animation});
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) => CustomPaint(
+        painter: _AmbientPainter(animation.value),
+      ),
+    );
+  }
+}
+
+class _AmbientPainter extends CustomPainter {
+  const _AmbientPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final p = Paint();
+    final x = math.sin(t * math.pi * 2) * .12;
+    final y = math.cos(t * math.pi * 2) * .08;
+    p.shader = RadialGradient(
+      center: Alignment(-.55 + x, -.9 + y),
+      radius: .85,
+      colors: [TetherColors.violet.withValues(alpha: .12), Colors.transparent],
+    ).createShader(rect);
+    canvas.drawRect(rect, p);
+    p.shader = RadialGradient(
+      center: Alignment(.85 - x, -.25),
+      radius: .7,
+      colors: [TetherColors.neon.withValues(alpha: .07), Colors.transparent],
+    ).createShader(rect);
+    canvas.drawRect(rect, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AmbientPainter oldDelegate) => oldDelegate.t != t;
+}
+
+class _DashboardBody extends StatelessWidget {
+  const _DashboardBody({required this.people, required this.loading});
+  final List<Person> people;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    final attention = const RelationshipAttentionService().prioritize(people, limit: 3);
+    final average = people.isEmpty
+        ? 0
+        : (people.fold<int>(0, (sum, p) => sum + p.bondXp) / people.length / 10)
+            .round()
+            .clamp(0, 100);
+    final strong = people
+        .where((p) => p.state == BondState.strong || p.state == BondState.thriving)
+        .length;
+    final needs = people.where((p) => p.state == BondState.needsAttention).length;
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          sliver: SliverToBoxAdapter(child: _TopBar(peopleCount: people.length)),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+          sliver: SliverToBoxAdapter(
+            child: _HealthHero(
+              health: average,
+              strong: strong,
+              needs: needs,
+              total: people.length,
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          sliver: SliverToBoxAdapter(
+            child: _SectionTitle(title: 'PEOPLE TO REACH TODAY', action: 'VIEW ALL'),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              children: attention.isEmpty
+                  ? [const _EmptyPriority()]
+                  : attention
+                      .map(
+                        (person) => Padding(
+                          padding: const EdgeInsets.only(bottom: 9),
+                          child: _PriorityCard(person: person),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
+          sliver: SliverToBoxAdapter(
+            child: _SectionTitle(title: 'RECENT INTERACTIONS', action: 'VIEW ALL'),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList.builder(
+            itemCount: math.min(people.length, 4),
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: _RecentCard(person: people[index]),
+            ),
+          ),
+        ),
+        const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+      ],
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.peopleCount});
+  final int peopleCount;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: TetherColors.violet.withValues(alpha: .8)),
+              boxShadow: [
+                BoxShadow(
+                  color: TetherColors.violet.withValues(alpha: .2),
+                  blurRadius: 18,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.all_inclusive_rounded,
+              color: TetherColors.violet,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TETHER',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                ),
+              ),
+              Text(
+                'STRONGER BONDS. BETTER YOU.',
+                style: TextStyle(
+                  fontSize: 7,
+                  color: TetherColors.neon,
+                  letterSpacing: 1.3,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          _IconButton(icon: Icons.search_rounded),
+          const SizedBox(width: 8),
+          _IconButton(icon: Icons.notifications_none_rounded),
+        ],
+      );
+}
+
+class _IconButton extends StatelessWidget {
+  const _IconButton({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: TetherColors.surface.withValues(alpha: .8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: TetherColors.line),
+        ),
+        child: Icon(icon, size: 19, color: TetherColors.text),
+      );
+}
+
+class _HealthHero extends StatelessWidget {
+  const _HealthHero({
+    required this.health,
+    required this.strong,
+    required this.needs,
+    required this.total,
+  });
+
+  final int health;
+  final int strong;
+  final int needs;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: TetherColors.line),
+          gradient: LinearGradient(
+            colors: [
+              TetherColors.surfaceRaised.withValues(alpha: .94),
+              TetherColors.surface.withValues(alpha: .82),
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            _HealthRing(value: health),
+            const SizedBox(width: 17),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'YOUR RELATIONSHIPS AT A GLANCE',
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: TetherColors.muted,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    health >= 80
+                        ? 'Your circle is strong.'
+                        : 'A few bonds need attention.',
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _Metric(value: '$strong', label: 'STRONG'),
+                      const SizedBox(width: 18),
+                      _Metric(value: '$needs', label: 'ATTENTION'),
+                      const SizedBox(width: 18),
+                      _Metric(value: '$total', label: 'PEOPLE'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _HealthRing extends StatelessWidget {
+  const _HealthRing({required this.value});
+  final int value;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 102,
+        height: 102,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 96,
+              height: 96,
+              child: CircularProgressIndicator(
+                value: value / 100,
+                strokeWidth: 6,
+                backgroundColor: TetherColors.line,
+                valueColor: const AlwaysStoppedAnimation(TetherColors.neon),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$value',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Text(
+                  'OVERALL HEALTH',
+                  style: TextStyle(
+                    fontSize: 6,
+                    color: TetherColors.muted,
+                    letterSpacing: .9,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({required this.value, required this.label});
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 6.5,
+              color: TetherColors.muted,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      );
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, required this.action});
+  final String title;
+  final String action;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 9,
+                letterSpacing: 1.7,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Text(
+            action,
+            style: const TextStyle(
+              fontSize: 8,
+              color: TetherColors.violet,
+              letterSpacing: .8,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      );
+}
+
+class _PriorityCard extends StatelessWidget {
+  const _PriorityCard({required this.person});
+  final Person person;
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = person.state == BondState.needsAttention;
+    return _TapCard(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RelationshipDetailScreen(personId: person.id),
+        ),
+      ),
+      child: Row(
+        children: [
+          _Avatar(
+            person: person,
+            accent: urgent ? TetherColors.danger : TetherColors.neon,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        person.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    _PriorityPill(urgent: urgent),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  person.tags.isEmpty ? 'Important person' : person.tags.first,
+                  style: const TextStyle(
+                    color: TetherColors.muted,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  urgent
+                      ? 'Bond needs attention'
+                      : 'Keep the connection alive',
+                  style: TextStyle(
+                    color: urgent ? TetherColors.danger : TetherColors.muted,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: TetherColors.muted),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriorityPill extends StatelessWidget {
+  const _PriorityPill({required this.urgent});
+  final bool urgent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = urgent ? TetherColors.danger : TetherColors.violet;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: .35)),
+      ),
+      child: Text(
+        urgent ? 'HIGH PRIORITY' : 'TODAY',
+        style: TextStyle(
+          fontSize: 6.5,
+          color: color,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .7,
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentCard extends StatelessWidget {
+  const _RecentCard({required this.person});
+  final Person person;
+
+  @override
+  Widget build(BuildContext context) => _TapCard(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RelationshipDetailScreen(personId: person.id),
+          ),
+        ),
+        child: Row(
+          children: [
+            _Avatar(person: person, accent: TetherColors.violet),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    person.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${person.recentInteractions} recent interactions · Bond XP ${person.bondXp}',
+                    style: const TextStyle(
+                      color: TetherColors.muted,
+                      fontSize: 9,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '+${person.recentInteractions * 3} XP',
+              style: const TextStyle(
+                color: TetherColors.neon,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.person, required this.accent});
+  final Person person;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [
+              accent.withValues(alpha: .9),
+              TetherColors.violet.withValues(alpha: .75),
+            ],
+          ),
+          border: Border.all(color: accent, width: 1.5),
+          boxShadow: [
+            BoxShadow(color: accent.withValues(alpha: .15), blurRadius: 12),
+          ],
+        ),
+        child: Text(
+          person.initials,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+      );
+}
+
+class _TapCard extends StatelessWidget {
+  const _TapCard({required this.child, required this.onTap});
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: TetherColors.surface.withValues(alpha: .86),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: TetherColors.line.withValues(alpha: .85)),
+            ),
+            child: child,
+          ),
+        ),
+      );
+}
+
+class _EmptyPriority extends StatelessWidget {
+  const _EmptyPriority();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: TetherColors.surface.withValues(alpha: .7),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: TetherColors.line),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.auto_awesome_rounded, color: TetherColors.neon),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'You are caught up. TETHER will surface the next meaningful connection.',
+                style: TextStyle(color: TetherColors.muted, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _PeopleBody extends StatefulWidget {
+  const _PeopleBody({required this.people});
+  final List<Person> people;
+
+  @override
+  State<_PeopleBody> createState() => _PeopleBodyState();
+}
+
+class _PeopleBodyState extends State<_PeopleBody> {
+  final _searchController = TextEditingController();
+  String _filter = 'ALL';
+  String _sort = 'HEALTH';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Person> get _visiblePeople {
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = widget.people.where((person) {
+      final matchesQuery = query.isEmpty ||
+          person.name.toLowerCase().contains(query) ||
+          person.tags.any((tag) => tag.toLowerCase().contains(query));
+      final matchesFilter = switch (_filter) {
+        'ATTENTION' => person.state == BondState.needsAttention,
+        'THRIVING' => person.state == BondState.thriving,
+        'RECENT' => person.lastInteractionAt != null,
+        _ => true,
+      };
+      return matchesQuery && matchesFilter;
+    }).toList();
+
+    filtered.sort((a, b) {
+      switch (_sort) {
+        case 'NAME':
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        case 'XP':
+          return b.bondXp.compareTo(a.bondXp);
+        case 'RECENT':
+          return (b.lastInteractionAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+              .compareTo(a.lastInteractionAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+        default:
+          return _healthRank(b.state).compareTo(_healthRank(a.state));
+      }
+    });
+    return filtered;
+  }
+
+  int _healthRank(BondState state) => switch (state) {
+        BondState.needsAttention => 0,
+        BondState.steady => 1,
+        BondState.strong => 2,
+        BondState.thriving => 3,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final people = _visiblePeople;
+    final attention = widget.people.where((p) => p.state == BondState.needsAttention).length;
+    final thriving = widget.people.where((p) => p.state == BondState.thriving).length;
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+          sliver: SliverToBoxAdapter(
+            child: _PeopleHeader(
+              total: widget.people.length,
+              attention: attention,
+              thriving: thriving,
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverToBoxAdapter(child: _PeopleSearch(controller: _searchController, onChanged: (_) => setState(() {}))),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _FilterScroller(
+                    selected: _filter,
+                    options: const ['ALL', 'ATTENTION', 'THRIVING', 'RECENT'],
+                    onSelected: (value) => setState(() => _filter = value),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _SortButton(
+                  value: _sort,
+                  onSelected: (value) => setState(() => _sort = value),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'YOUR CIRCLE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      letterSpacing: 1.8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${people.length} ${people.length == 1 ? 'PERSON' : 'PEOPLE'}',
+                  style: const TextStyle(
+                    fontSize: 8,
+                    color: TetherColors.muted,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (people.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+            sliver: SliverToBoxAdapter(
+              child: _PeopleEmptyState(hasPeople: widget.people.isNotEmpty),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList.builder(
+              itemCount: people.length,
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _PeopleCard(person: people[index]),
+              ),
+            ),
+          ),
+        const SliverPadding(padding: EdgeInsets.only(bottom: 30)),
+      ],
+    );
+  }
+}
+
+class _PeopleHeader extends StatelessWidget {
+  const _PeopleHeader({
+    required this.total,
+    required this.attention,
+    required this.thriving,
+  });
+
+  final int total;
+  final int attention;
+  final int thriving;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PEOPLE',
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Your circle, ranked by relationship health.',
+                      style: TextStyle(color: TetherColors.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: TetherColors.violet.withValues(alpha: .1),
+                  border: Border.all(color: TetherColors.violet.withValues(alpha: .35)),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, color: TetherColors.violet, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+            decoration: BoxDecoration(
+              color: TetherColors.surface.withValues(alpha: .82),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: TetherColors.line),
+            ),
+            child: Row(
+              children: [
+                _PeopleMetric(value: '$total', label: 'TOTAL', accent: TetherColors.text),
+                _MetricDivider(),
+                _PeopleMetric(value: '$thriving', label: 'THRIVING', accent: TetherColors.neon),
+                _MetricDivider(),
+                _PeopleMetric(value: '$attention', label: 'ATTENTION', accent: TetherColors.danger),
+              ],
+            ),
+          ),
+        ],
+      );
+}
+
+class _PeopleMetric extends StatelessWidget {
+  const _PeopleMetric({required this.value, required this.label, required this.accent});
+  final String value;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: accent)),
+            const SizedBox(height: 3),
+            Text(label, style: const TextStyle(fontSize: 6.5, color: TetherColors.muted, letterSpacing: 1, fontWeight: FontWeight.w800)),
+          ],
+        ),
+      );
+}
+
+class _MetricDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(width: 1, height: 26, color: TetherColors.line);
+}
+
+class _PeopleSearch extends StatelessWidget {
+  const _PeopleSearch({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'Search people, tags, or memories...',
+          hintStyle: const TextStyle(color: TetherColors.muted, fontSize: 11),
+          prefixIcon: const Icon(Icons.search_rounded, size: 19, color: TetherColors.muted),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 17),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                ),
+          filled: true,
+          fillColor: TetherColors.surface.withValues(alpha: .88),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: TetherColors.line),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: TetherColors.line),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: TetherColors.violet.withValues(alpha: .65)),
+          ),
+        ),
+      );
+}
+
+class _FilterScroller extends StatelessWidget {
+  const _FilterScroller({required this.selected, required this.options, required this.onSelected});
+  final String selected;
+  final List<String> options;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: options.map((option) {
+            final active = option == selected;
+            return Padding(
+              padding: const EdgeInsets.only(right: 7),
+              child: GestureDetector(
+                onTap: () => onSelected(option),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: active ? TetherColors.violet.withValues(alpha: .14) : TetherColors.surface.withValues(alpha: .65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: active ? TetherColors.violet.withValues(alpha: .55) : TetherColors.line),
+                  ),
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: 7,
+                      letterSpacing: .8,
+                      fontWeight: FontWeight.w900,
+                      color: active ? TetherColors.violet : TetherColors.muted,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+}
+
+class _SortButton extends StatelessWidget {
+  const _SortButton({required this.value, required this.onSelected});
+  final String value;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+        onSelected: onSelected,
+        color: TetherColors.surfaceRaised,
+        itemBuilder: (context) => const [
+          PopupMenuItem(value: 'HEALTH', child: Text('Health')),
+          PopupMenuItem(value: 'NAME', child: Text('Name')),
+          PopupMenuItem(value: 'XP', child: Text('Bond XP')),
+          PopupMenuItem(value: 'RECENT', child: Text('Recent contact')),
+        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          decoration: BoxDecoration(
+            color: TetherColors.surface.withValues(alpha: .65),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: TetherColors.line),
+          ),
+          child: const Icon(Icons.tune_rounded, size: 16, color: TetherColors.muted),
+        ),
+      );
+}
+
+class _PeopleCard extends StatelessWidget {
+  const _PeopleCard({required this.person});
+  final Person person;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (person.state) {
+      BondState.thriving => TetherColors.neon,
+      BondState.strong => TetherColors.violet,
+      BondState.steady => TetherColors.text,
+      BondState.needsAttention => TetherColors.danger,
+    };
+    final progress = (person.bondXp / 1000).clamp(0, 1).toDouble();
+    final cadence = person.cadence.name.toUpperCase();
+
+    return Material(
+      color: TetherColors.surface.withValues(alpha: .9),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RelationshipDetailScreen(personId: person.id),
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 12, 13),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: TetherColors.line.withValues(alpha: .9)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _Avatar(person: person, accent: color),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                person.name,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                            _StatePill(state: person.state, color: color),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          person.tags.isEmpty ? 'No tags yet' : person.tags.take(2).join('  ·  '),
+                          style: const TextStyle(fontSize: 9, color: TetherColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 19, color: TetherColors.muted),
+                ],
+              ),
+              const SizedBox(height: 13),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniProgress(label: 'BOND XP', value: '${person.bondXp}', progress: progress, color: color),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: _MiniProgress(
+                      label: 'CADENCE',
+                      value: cadence,
+                      progress: (person.recentInteractions.clamp(0, 7) / 7).toDouble(),
+                      color: TetherColors.violet,
+                    ),
+                  ),
+                ],
+              ),
+              if (person.lastInteractionAt != null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded, size: 12, color: TetherColors.muted),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Last contact ${_relativeDate(person.lastInteractionAt!)}',
+                      style: const TextStyle(fontSize: 8, color: TetherColors.muted),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${person.memoryCount} memories',
+                      style: const TextStyle(fontSize: 8, color: TetherColors.muted),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatePill extends StatelessWidget {
+  const _StatePill({required this.state, required this.color});
+  final BondState state;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: .3)),
+        ),
+        child: Text(
+          _stateLabel(state),
+          style: TextStyle(
+            color: color,
+            fontSize: 6.5,
+            fontWeight: FontWeight.w900,
+            letterSpacing: .6,
+          ),
+        ),
+      );
+}
+
+class _MiniProgress extends StatelessWidget {
+  const _MiniProgress({required this.label, required this.value, required this.progress, required this.color});
+  final String label;
+  final String value;
+  final double progress;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(label, style: const TextStyle(fontSize: 6.5, color: TetherColors.muted, letterSpacing: 1, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text(value, style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              color: color,
+              backgroundColor: TetherColors.line,
+            ),
+          ),
+        ],
+      );
+}
+
+class _PeopleEmptyState extends StatelessWidget {
+  const _PeopleEmptyState({required this.hasPeople});
+  final bool hasPeople;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: TetherColors.surface.withValues(alpha: .76),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: TetherColors.line),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              hasPeople ? Icons.search_off_rounded : Icons.people_outline_rounded,
+              color: TetherColors.violet,
+              size: 38,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hasPeople ? 'NO MATCHES' : 'YOUR CIRCLE IS EMPTY',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              hasPeople
+                  ? 'Change the search or filter and TETHER will surface the right people.'
+                  : 'Add your first relationship and start building your bond network.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: TetherColors.muted, fontSize: 10, height: 1.4),
+            ),
+          ],
+        ),
+      );
+}
+
+String _stateLabel(BondState state) => switch (state) {
+      BondState.thriving => 'THRIVING',
+      BondState.strong => 'STRONG',
+      BondState.steady => 'STEADY',
+      BondState.needsAttention => 'ATTENTION',
+    };
+
+String _relativeDate(DateTime date) {
+  final delta = DateTime.now().difference(date);
+  if (delta.inMinutes < 1) return 'just now';
+  if (delta.inHours < 1) return '${delta.inMinutes}m ago';
+  if (delta.inDays < 1) return '${delta.inHours}h ago';
+  if (delta.inDays == 1) return 'yesterday';
+  if (delta.inDays < 30) return '${delta.inDays}d ago';
+  return '${date.month}/${date.day}/${date.year}';
+}
+
+class _ReminderBody extends StatelessWidget {
+  const _ReminderBody();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.notifications_active_outlined, color: TetherColors.violet, size: 42),
+              SizedBox(height: 14),
+              Text('SMART REMINDERS', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.4)),
+              SizedBox(height: 7),
+              Text(
+                'TETHER will turn relationship cadence and context into timely reminders.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: TetherColors.muted),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _ProfileBody extends StatelessWidget {
+  const _ProfileBody();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.person_outline_rounded, color: TetherColors.neon, size: 42),
+              SizedBox(height: 14),
+              Text('YOUR TETHER PROFILE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.4)),
+              SizedBox(height: 7),
+              Text(
+                'Profile preferences and intelligence controls will live here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: TetherColors.muted),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _BottomNav extends StatelessWidget {
+  const _BottomNav({required this.selected, required this.onSelected, required this.onAdd});
+  final int selected;
+  final ValueChanged<int> onSelected;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) => BottomAppBar(
+        color: TetherColors.obsidian.withValues(alpha: .97),
+        elevation: 0,
+        height: 76,
+        child: Row(
+          children: [
+            _NavItem(
+              icon: Icons.grid_view_rounded,
+              label: 'Dashboard',
+              selected: selected == 0,
+              onTap: () => onSelected(0),
+            ),
+            _NavItem(
+              icon: Icons.people_outline_rounded,
+              label: 'People',
+              selected: selected == 1,
+              onTap: () => onSelected(1),
+            ),
+            Expanded(
+              child: Center(
+                child: GestureDetector(
+                  onTap: onAdd,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [TetherColors.violet, TetherColors.neon],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: TetherColors.violet.withValues(alpha: .28),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: TetherColors.obsidian,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            _NavItem(
+              icon: Icons.notifications_none_rounded,
+              label: 'Reminders',
+              selected: selected == 2,
+              onTap: () => onSelected(2),
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Profile',
+              selected: selected == 3,
+              onTap: () => onSelected(3),
+            ),
+          ],
+        ),
+      );
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({required this.icon, required this.label, required this.selected, required this.onTap});
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? TetherColors.violet : TetherColors.muted,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 7,
+                  color: selected ? TetherColors.violet : TetherColors.muted,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
