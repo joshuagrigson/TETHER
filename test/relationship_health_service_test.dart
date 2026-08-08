@@ -10,8 +10,13 @@ void main() {
     expect(service.classify(person), BondState.thriving);
   });
 
+  test('classifies a strong relationship', () {
+    const person = Person(id: '2', name: 'B', initials: 'B', bondXp: 600, recentInteractions: 4, cadence: Cadence.weekly, state: BondState.strong);
+    expect(service.classify(person), BondState.strong);
+  });
+
   test('classifies a relationship needing attention', () {
-    const person = Person(id: '2', name: 'B', initials: 'B', bondXp: 0, recentInteractions: 0, cadence: Cadence.weekly, state: BondState.needsAttention);
+    const person = Person(id: '3', name: 'C', initials: 'C', bondXp: 0, recentInteractions: 0, cadence: Cadence.weekly, state: BondState.needsAttention);
     expect(service.classify(person), BondState.needsAttention);
   });
 }
