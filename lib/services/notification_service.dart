@@ -4,12 +4,14 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
-  const NotificationService({FlutterLocalNotificationsPlugin? plugin}) : _plugin = plugin ?? const FlutterLocalNotificationsPlugin();
+  NotificationService({FlutterLocalNotificationsPlugin? plugin})
+      : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   final FlutterLocalNotificationsPlugin _plugin;
   static const _channelId = 'tether_relationships';
   static const _channelName = 'Relationship reminders';
-  static const _channelDescription = 'Timely reminders to invest in important relationships.';
+  static const _channelDescription =
+      'Timely reminders to invest in important relationships.';
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
@@ -19,16 +21,31 @@ class NotificationService {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwin = DarwinInitializationSettings();
     await _plugin.initialize(
-      const InitializationSettings(android: android, iOS: darwin, macOS: darwin),
+      const InitializationSettings(
+        android: android,
+        iOS: darwin,
+        macOS: darwin,
+      ),
     );
   }
 
   Future<void> requestPermissions() async {
-    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
-    await _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()?.requestPermissions(alert: true, badge: true, sound: true);
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
-  Future<void> scheduleRelationshipReminder({required int id, required String personName, required String reason, required DateTime when}) async {
+  Future<void> scheduleRelationshipReminder({
+    required int id,
+    required String personName,
+    required String reason,
+    required DateTime when,
+  }) async {
     final scheduled = tz.TZDateTime.from(when, tz.local);
     await _plugin.zonedSchedule(
       id,
@@ -36,12 +53,17 @@ class NotificationService {
       reason,
       scheduled,
       const NotificationDetails(
-        android: AndroidNotificationDetails(_channelId, _channelName, channelDescription: _channelDescription, importance: Importance.high, priority: Priority.high),
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
         iOS: DarwinNotificationDetails(),
         macOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
