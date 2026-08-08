@@ -22,6 +22,23 @@ jobs:
       - name: Generate Android platform shell
         run: flutter create . --platforms=android --org=com.tether --project-name=tether
 
+      - name: Configure Android core library desugaring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/build.gradle.kts')
+          text = path.read_text()
+          if 'isCoreLibraryDesugaringEnabled = true' not in text:
+              text = text.replace(
+                  'compileOptions {\n',
+                  'compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n',
+                  1,
+              )
+          if 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")' not in text:
+              text += '\n\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")\n}\n'
+          path.write_text(text)
+          PY
+
       - name: Remove generated template test
         run: rm -f test/widget_test.dart
 
