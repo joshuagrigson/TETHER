@@ -9,39 +9,73 @@ class RelationshipAttentionService {
   List<Person> prioritize(List<Person> people, {DateTime? now, int limit = 5}) {
     final reference = now ?? DateTime.now();
     final ranked = people.toList()
-      ..sort((a, b) => _score(b, reference).compareTo(_score(a, reference)));
+      ..sort((a, b) => score(b, now: reference).compareTo(score(a, now: reference)));
     return ranked.take(limit).toList(growable: false);
   }
 
-  int _score(Person person, DateTime now) {
+  int score(Person person, {DateTime? now}) {
+    final reference = now ?? DateTime.now();
     var score = 0;
-    if (_reminderService.isDue(person, now: now)) score += 100;
+
     if (person.lastInteractionAt == null) {
-      score += 40;
+      score += 70;
     } else {
       final due = _reminderService.nextDue(person);
-      final overdueDays = now.isAfter(due) ? now.difference(due).inDays : 0;
-      score += (overdueDays * 8).clamp(0, 64);
+      final overdueDays = reference.isAfter(due) ? reference.difference(due).inDays : 0;
+      score += (overdueDays * 12).clamp(0, 72);
+
+      final daysSinceContact = reference.difference(person.lastInteractionAt!).inDays;
+      final cadenceDays = _cadenceDays(person.cadence);
+      if (daysSinceContact >= cadenceDays) score += 35;
+      if (daysSinceContact >= cadenceDays * 2) score += 25;
     }
 
+    if (_reminderService.isDue(person, now: reference)) score += 100;
+
     score += switch (person.state) {
-      BondState.needsAttention => 30,
-      BondState.steady => 15,
-      BondState.strong => 5,
+      BondState.needsAttention => 40,
+      BondState.steady => 18,
+      BondState.strong => 6,
       BondState.thriving => 0,
     };
+
+    if (person.importantDates.isNotEmpty) score += 8;
+    if (person.memoryCount == 0) score += 5;
+
     return score;
   }
 
   String reason(Person person, {DateTime? now}) {
     final reference = now ?? DateTime.now();
-    if (person.lastInteractionAt == null) return 'No interaction recorded yet';
+    if (person.lastInteractionAt == null) return 'No meaningful contact recorded yet';
+
     final due = _reminderService.nextDue(person);
     if (reference.isAfter(due)) {
       final days = reference.difference(due).inDays;
-      return days <= 1 ? 'Due today' : '$days days overdue';
+      return days <= 1 ? 'Contact is due today' : '$days days overdue';
     }
-    final days = due.difference(reference).inDays;
-    return days <= 1 ? 'Due today' : 'Due in $days days';
+
+    final daysSinceContact = reference.difference(person.lastInteractionAt!).inDays;
+    final cadenceDays = _cadenceDays(person.cadence);
+    if (daysSinceContact >= cadenceDays) return 'Past your ${person.cadence.name} cadence';
+    if (person.state == BondState.needsAttention) return 'Bond health is declining';
+    if (person.memoryCount == 0) return 'Capture a memory to strengthen context';
+    return 'Keep the connection active';
   }
+
+  String nextBestAction(Person person, {DateTime? now}) {
+    final reference = now ?? DateTime.now();
+    if (person.lastInteractionAt == null) return 'Reach out and establish the first touchpoint';
+    if (_reminderService.isDue(person, now: reference)) return 'Reach out today';
+    if (person.memoryCount == 0) return 'Capture something worth remembering';
+    if (person.state == BondState.needsAttention) return 'Reconnect with a meaningful conversation';
+    if (person.importantDates.isNotEmpty) return 'Review an upcoming important date';
+    return 'Keep the bond active';
+  }
+
+  int _cadenceDays(Cadence cadence) => switch (cadence) {
+    Cadence.daily => 1,
+    Cadence.weekly => 7,
+    Cadence.occasional => 30,
+  };
 }
