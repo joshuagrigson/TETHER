@@ -36,6 +36,7 @@ class RelationshipProvider extends ChangeNotifier {
     save(person.copyWith(
       recentInteractions: person.recentInteractions + 1,
       bondXp: person.bondXp + xp,
+      lastInteractionAt: DateTime.now(),
     ));
   }
 
