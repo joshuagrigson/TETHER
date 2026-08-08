@@ -15,6 +15,7 @@ class Person {
     this.tags = const [],
     this.importantDates = const [],
     this.memoryCount = 0,
+    this.lastInteractionAt,
   });
 
   final String id;
@@ -28,8 +29,22 @@ class Person {
   final List<String> tags;
   final List<String> importantDates;
   final int memoryCount;
+  final DateTime? lastInteractionAt;
 
-  Person copyWith({String? name, String? initials, int? bondXp, int? recentInteractions, Cadence? cadence, BondState? state, List<String>? notes, List<String>? tags, List<String>? importantDates, int? memoryCount}) => Person(id: id, name: name ?? this.name, initials: initials ?? this.initials, bondXp: bondXp ?? this.bondXp, recentInteractions: recentInteractions ?? this.recentInteractions, cadence: cadence ?? this.cadence, state: state ?? this.state, notes: notes ?? this.notes, tags: tags ?? this.tags, importantDates: importantDates ?? this.importantDates, memoryCount: memoryCount ?? this.memoryCount);
+  Person copyWith({String? name, String? initials, int? bondXp, int? recentInteractions, Cadence? cadence, BondState? state, List<String>? notes, List<String>? tags, List<String>? importantDates, int? memoryCount, DateTime? lastInteractionAt}) => Person(
+    id: id,
+    name: name ?? this.name,
+    initials: initials ?? this.initials,
+    bondXp: bondXp ?? this.bondXp,
+    recentInteractions: recentInteractions ?? this.recentInteractions,
+    cadence: cadence ?? this.cadence,
+    state: state ?? this.state,
+    notes: notes ?? this.notes,
+    tags: tags ?? this.tags,
+    importantDates: importantDates ?? this.importantDates,
+    memoryCount: memoryCount ?? this.memoryCount,
+    lastInteractionAt: lastInteractionAt ?? this.lastInteractionAt,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -43,6 +58,7 @@ class Person {
     'tags': tags,
     'importantDates': importantDates,
     'memoryCount': memoryCount,
+    'lastInteractionAt': lastInteractionAt?.toIso8601String(),
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -57,5 +73,6 @@ class Person {
     tags: List<String>.from(json['tags'] as List<dynamic>? ?? const []),
     importantDates: List<String>.from(json['importantDates'] as List<dynamic>? ?? const []),
     memoryCount: (json['memoryCount'] as num?)?.toInt() ?? 0,
+    lastInteractionAt: json['lastInteractionAt'] == null ? null : DateTime.tryParse(json['lastInteractionAt'] as String),
   );
 }
