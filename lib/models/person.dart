@@ -29,28 +29,33 @@ class Person {
   final List<String> importantDates;
   final int memoryCount;
 
-  Person copyWith({
-    String? name,
-    String? initials,
-    int? bondXp,
-    int? recentInteractions,
-    Cadence? cadence,
-    BondState? state,
-    List<String>? notes,
-    List<String>? tags,
-    List<String>? importantDates,
-    int? memoryCount,
-  }) => Person(
-    id: id,
-    name: name ?? this.name,
-    initials: initials ?? this.initials,
-    bondXp: bondXp ?? this.bondXp,
-    recentInteractions: recentInteractions ?? this.recentInteractions,
-    cadence: cadence ?? this.cadence,
-    state: state ?? this.state,
-    notes: notes ?? this.notes,
-    tags: tags ?? this.tags,
-    importantDates: importantDates ?? this.importantDates,
-    memoryCount: memoryCount ?? this.memoryCount,
+  Person copyWith({String? name, String? initials, int? bondXp, int? recentInteractions, Cadence? cadence, BondState? state, List<String>? notes, List<String>? tags, List<String>? importantDates, int? memoryCount}) => Person(id: id, name: name ?? this.name, initials: initials ?? this.initials, bondXp: bondXp ?? this.bondXp, recentInteractions: recentInteractions ?? this.recentInteractions, cadence: cadence ?? this.cadence, state: state ?? this.state, notes: notes ?? this.notes, tags: tags ?? this.tags, importantDates: importantDates ?? this.importantDates, memoryCount: memoryCount ?? this.memoryCount);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'initials': initials,
+    'bondXp': bondXp,
+    'recentInteractions': recentInteractions,
+    'cadence': cadence.name,
+    'state': state.name,
+    'notes': notes,
+    'tags': tags,
+    'importantDates': importantDates,
+    'memoryCount': memoryCount,
+  };
+
+  factory Person.fromJson(Map<String, dynamic> json) => Person(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    initials: json['initials'] as String,
+    bondXp: (json['bondXp'] as num).toInt(),
+    recentInteractions: (json['recentInteractions'] as num).toInt(),
+    cadence: Cadence.values.byName(json['cadence'] as String),
+    state: BondState.values.byName(json['state'] as String),
+    notes: List<String>.from(json['notes'] as List<dynamic>? ?? const []),
+    tags: List<String>.from(json['tags'] as List<dynamic>? ?? const []),
+    importantDates: List<String>.from(json['importantDates'] as List<dynamic>? ?? const []),
+    memoryCount: (json['memoryCount'] as num?)?.toInt() ?? 0,
   );
 }
