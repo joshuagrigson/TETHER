@@ -12,7 +12,9 @@ class RelationshipRepository {
 
   Person? findById(String id) {
     for (final person in _people) {
-      if (person.id == id) return person;
+      if (person.id == id) {
+        return person;
+      }
     }
     return null;
   }
@@ -38,7 +40,11 @@ class RelationshipRepository {
 
   void save(Person person) {
     final index = _people.indexWhere((item) => item.id == person.id);
-    if (index == -1) _people.add(person); else _people[index] = person;
+    if (index == -1) {
+      _people.add(person);
+    } else {
+      _people[index] = person;
+    }
   }
 
   void delete(String id) => _people.removeWhere((person) => person.id == id);
