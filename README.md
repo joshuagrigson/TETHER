@@ -4,16 +4,20 @@ TETHER is a premium, futuristic, anime-inspired relationship intelligence app bu
 
 ## Current build
 
-**Phase 2 — Relationship intelligence surface** is now implemented on the feature branch:
+**Phase 3 — Relationship intelligence engine** is now underway on the feature branch:
 
 - Relationship profiles with bond health and XP gauges
-- Interaction timeline model and seeded timeline presentation
-- Memories, tags, important dates, and notes in the domain model
-- Add-note flow directly from a relationship profile
-- Edit relationship flow
-- Repository boundary for relationship data
-- ChangeNotifier provider for application state
-- Dashboard cards now open real relationship profiles
+- Interaction logging for conversations and calls
+- Bond XP automatically increases when interactions are logged
+- Health state automatically recalculates from relationship activity
+- Last interaction timestamps persist across app restarts
+- Cadence-based reminder service for daily, weekly, and occasional relationships
+- Dashboard search across names and tags
+- Dashboard health filters for thriving, strong, steady, and attention states
+- Add/edit relationship flows
+- Notes, memories, tags, and important dates in the domain model
+- Local persistence through `SharedPreferences`
+- Provider/repository boundaries for application state and persistence
 - Flutter CI for analysis and unit tests
 
 ## Architecture
