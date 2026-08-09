@@ -16,7 +16,8 @@ void main() {
   test('new relationships are surfaced immediately', () {
     const person = Person(id: '1', name: 'New', initials: 'N', bondXp: 0, recentInteractions: 0, cadence: Cadence.weekly, state: BondState.needsAttention);
     expect(service.prioritize([person], now: now).single, person);
-    expect(service.reason(person, now: now), 'No interaction recorded yet');
+    expect(service.reason(person, now: now), 'No meaningful contact recorded yet');
+    expect(service.nextBestAction(person, now: now), 'Reach out and establish the first touchpoint');
   });
 
   test('reports overdue days', () {
