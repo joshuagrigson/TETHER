@@ -11,7 +11,15 @@ class RelationshipAttentionService {
     final reference = now ?? DateTime.now();
     final ranked = people.toList()
       ..sort((a, b) => score(b, now: reference).compareTo(score(a, now: reference)));
-    return ranked.take(limit).toList(growable: false);
+
+    // The dashboard's existing priority card displays the first tag as its
+    // relationship subtitle. Return presentation copies so the dashboard can
+    // surface WHY -> ACTION without changing persisted relationship data.
+    return ranked.take(limit).map((person) {
+      final signal = '${priorityHeadline(person, now: reference)} · ${priorityAction(person, now: reference)}';
+      final tags = [signal, ...person.tags.where((tag) => tag != signal)];
+      return person.copyWith(tags: tags);
+    }).toList(growable: false);
   }
 
   int score(Person person, {DateTime? now}) {
