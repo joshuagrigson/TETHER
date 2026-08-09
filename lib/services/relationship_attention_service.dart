@@ -1,6 +1,22 @@
 import '../models/person.dart';
 import 'reminder_service.dart';
 
+class RelationshipPriority {
+  const RelationshipPriority({
+    required this.person,
+    required this.headline,
+    required this.detail,
+    required this.action,
+    required this.score,
+  });
+
+  final Person person;
+  final String headline;
+  final String detail;
+  final String action;
+  final int score;
+}
+
 class RelationshipAttentionService {
   const RelationshipAttentionService({ReminderService reminderService = const ReminderService()})
       : _reminderService = reminderService;
@@ -11,14 +27,26 @@ class RelationshipAttentionService {
     final reference = now ?? DateTime.now();
     final ranked = people.toList()
       ..sort((a, b) => score(b, now: reference).compareTo(score(a, now: reference)));
+    return ranked.take(limit).toList(growable: false);
+  }
 
-    // The dashboard's existing priority card displays the first tag as its
-    // relationship subtitle. Return presentation copies so the dashboard can
-    // surface WHY -> ACTION without changing persisted relationship data.
+  List<RelationshipPriority> prioritizeWithIntelligence(
+    List<Person> people, {
+    DateTime? now,
+    int limit = 5,
+  }) {
+    final reference = now ?? DateTime.now();
+    final ranked = people.toList()
+      ..sort((a, b) => score(b, now: reference).compareTo(score(a, now: reference)));
+
     return ranked.take(limit).map((person) {
-      final signal = '${priorityHeadline(person, now: reference)} · ${priorityAction(person, now: reference)}';
-      final tags = [signal, ...person.tags.where((tag) => tag != signal)];
-      return person.copyWith(tags: tags);
+      return RelationshipPriority(
+        person: person,
+        headline: priorityHeadline(person, now: reference),
+        detail: priorityDetail(person, now: reference),
+        action: priorityAction(person, now: reference),
+        score: score(person, now: reference),
+      );
     }).toList(growable: false);
   }
 
