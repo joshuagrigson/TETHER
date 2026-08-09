@@ -2,7 +2,8 @@ import '../models/person.dart';
 import 'reminder_service.dart';
 
 class RelationshipAttentionService {
-  const RelationshipAttentionService({ReminderService reminderService = const ReminderService()}) : _reminderService = reminderService;
+  const RelationshipAttentionService({ReminderService reminderService = const ReminderService()})
+      : _reminderService = reminderService;
 
   final ReminderService _reminderService;
 
@@ -73,9 +74,30 @@ class RelationshipAttentionService {
     return 'Keep the bond active';
   }
 
+  String priorityHeadline(Person person, {DateTime? now}) {
+    final reference = now ?? DateTime.now();
+    if (person.lastInteractionAt == null) return 'FIRST TOUCHPOINT';
+
+    final due = _reminderService.nextDue(person);
+    if (reference.isAfter(due)) {
+      final days = reference.difference(due).inDays;
+      return days <= 1 ? 'DUE TODAY' : '$days DAYS OVERDUE';
+    }
+
+    final daysSinceContact = reference.difference(person.lastInteractionAt!).inDays;
+    final cadenceDays = _cadenceDays(person.cadence);
+    if (daysSinceContact >= cadenceDays) return 'CADENCE MISSED';
+    if (person.state == BondState.needsAttention) return 'BOND NEEDS CARE';
+    return 'STAY CONNECTED';
+  }
+
+  String priorityDetail(Person person, {DateTime? now}) => reason(person, now: now);
+
+  String priorityAction(Person person, {DateTime? now}) => nextBestAction(person, now: now);
+
   int _cadenceDays(Cadence cadence) => switch (cadence) {
-    Cadence.daily => 1,
-    Cadence.weekly => 7,
-    Cadence.occasional => 30,
-  };
+        Cadence.daily => 1,
+        Cadence.weekly => 7,
+        Cadence.occasional => 30,
+      };
 }
