@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme/tether_theme.dart';
 import 'providers/relationship_provider.dart';
-import 'screens/dashboard/premium_dashboard_screen.dart';
+import 'screens/dashboard/north_star_dashboard_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 
 class TetherApp extends StatefulWidget {
@@ -43,7 +43,7 @@ class _TetherAppState extends State<TetherApp> {
               return const _TetherLaunchScreen();
             }
             if (snapshot.data == true) {
-              return const PremiumDashboardScreen();
+              return const NorthStarDashboardScreen();
             }
             return const OnboardingScreen();
           },
@@ -64,11 +64,7 @@ class _TetherLaunchScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.hub_outlined,
-              size: 46,
-              color: TetherColors.neon,
-            ),
+            Icon(Icons.hub_outlined, size: 46, color: TetherColors.violet),
             SizedBox(height: 18),
             Text(
               'TETHER',
