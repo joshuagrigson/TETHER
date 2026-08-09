@@ -38,7 +38,8 @@ void main() {
     final ranked = service.prioritize([recent, untouched], now: now);
 
     expect(ranked.first.id, 'untouched');
-    expect(service.reason(untouched, now: now), contains('first touchpoint'));
+    expect(service.reason(untouched, now: now), 'No meaningful contact recorded yet');
+    expect(service.nextBestAction(untouched, now: now), contains('first touchpoint'));
   });
 
   test('identifies cadence overdue relationships', () {
@@ -48,7 +49,7 @@ void main() {
     );
 
     expect(service.score(p, now: now), greaterThan(0));
-    expect(service.reason(p, now: now), 'Past your weekly cadence');
+    expect(service.reason(p, now: now), '3 days overdue');
     expect(service.nextBestAction(p, now: now), 'Reach out today');
   });
 
